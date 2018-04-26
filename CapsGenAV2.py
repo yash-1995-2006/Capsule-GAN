@@ -4,15 +4,7 @@ from operator import mul
 
 batchSize=64
 
-#def squash(vector, epsilon=1e-9):
-'''
-    :param vector: A tensor with shape [batch_size, 1, num_caps, vec_len, 1] or [batch_size, num_caps, vec_len, 1]
-    :param epsilon: delta to prevent zero division
-    :return A tensor with the same shape as vector but squashed in 'vec_len' dimension.
-    '''
-    #squared_norm = tf.reduce_sum(tf.square(vector), axis=-2, keep_dims=True)
-    #scalar_factor = squared_norm / (1 + squared_norm) / tf.sqrt(squared_norm + epsilon)
-    #return(scalar_factor * vector)
+
 
 def squash(capsule, epsilon=1e-9):
     '''
@@ -39,10 +31,8 @@ def capsgen(x, initCapsuleSize = 32, batchSize = 64, isTrain = True):
     x = tf.expand_dims(tf.expand_dims(x,axis=2), axis=1, name='expanded_x')    #[batch size x number of capsules x capsules length x 1]
     capsule16, W16, C16, B16= capslayer(x, layerNo=1, capsuleLength=16, numberOfCapsules=10)                        #[batch size x number of capsules x capsules length x 1]
     capsule8, W8, C8, B8 = capslayer(capsule16, layerNo=2, capsuleLength=8, numberOfCapsules=1152)                #[batch size x number of capsules x capsules length x 1]
-    #print(capsule8)
     convImageSize = 6
     reshapedCaps = tf.reshape(capsule8, shape=[batchSize,convImageSize, convImageSize,-1], name="reshapedCaps")      #[batch size x x_dim x y_dim x number of filters]
-    #print(reshapedCaps)
     conv1 = tf.layers.conv2d_transpose(reshapedCaps,filters=128,kernel_size=[4,4], padding="valid", name='Conv1')
     relu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain), 0.2)
 
@@ -56,7 +46,6 @@ def capsgen(x, initCapsuleSize = 32, batchSize = 64, isTrain = True):
     relu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain), 0.2)
 
     tanh = tf.nn.tanh(relu4,name='tanh')
-    #return relu4
     return tanh, W16, C16, B16, W8, C8, B8
 
 
@@ -91,26 +80,19 @@ def modifiedDynamicRouting(inputCaps,outputCapsuleNumber, layerNo, iter=3, stdde
     with tf.variable_scope("mDR" + str(layerNo)):
         print("in mDR",layerNo," ",inputCaps)
         inputShape = inputCaps.get_shape().as_list()
-        #batchSize, numberOfInputCaps = inputShape[0], inputShape[1]
         numberOfInputCaps = inputShape[1]
         B = tf.Variable(name='B'+str(layerNo), trainable=False, initial_value=tf.random_normal([numberOfInputCaps, outputCapsuleNumber-1, 1, 1], dtype=tf.float32))
         expandedInput = generateNoisyVector(inputCaps, outputCapsuleNumber-1, stddev=stddev)
-        #agreedValues, C = 0, 0
         for i in range(iter):
             with tf.variable_scope('iter_' + str(i)):
-                # need to add a function to maintain the linear combination property
                 C = tf.nn.softmax(B, axis=2)
-                #print(B, C)
-                agreedValues = tf.multiply(expandedInput, C)
-                #print(agreedValues)
+                agreedValues = tf.multiply(expandedInput, C)                
                 sumExpandedCaps = tf.reduce_sum(agreedValues, axis=2)
                 extraCaps = tf.expand_dims(tf.subtract(inputCaps,sumExpandedCaps), axis=2)
                 if i == iter - 1:
                     agreedValues = tf.concat([agreedValues,extraCaps],axis=2)
-                if i < iter - 1:
-                    #reduceAgreedValues = tf.reduce_sum(tf.multiply(expandedInput, C), axis=1, keep_dims=True)
-                    inputCapsExpanded = tf.expand_dims(inputCaps, dim=2)
-                    #print(inputCapsExpanded)
+                if i < iter - 1:                    
+                    inputCapsExpanded = tf.expand_dims(inputCaps, dim=2)                    
                     A = tf.reduce_sum(tf.reduce_sum(tf.multiply(agreedValues, inputCapsExpanded), axis=3, keepdims=True),)
                     B += A
         return agreedValues, C, B
@@ -141,21 +123,4 @@ def capslayer(x, capsuleLength, numberOfCapsules, layerNo, routing = 'Modified D
         reducedWeightedVectors = tf.reduce_sum(weightedVectors, axis=1) #[batch size x outputCapsuleNumber x output capsule length x 1]
         capsule = squash(reducedWeightedVectors)
     return capsule, W, C, B
-
-
-'''
-rand = tf.random_normal([64,32])
-init = tf.global_variables_initializer()
-sess = tf.Session()
-sess.run(init)
-sess.run(capsgen(rand))
-'''
-'''
-sess = tf.InteractiveSession()
-x = tf.placeholder(tf.float32, shape=(None, 32))
-x_ = np.random.randn(1,32)
-g = capsgen(x)
-tf.global_variables_initializer().run()
-#print(sess.run([g],{x:x_}))
-'''
 
