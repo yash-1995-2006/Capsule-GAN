@@ -19,12 +19,7 @@ batch_size = 64
 lr = 0.005
 train_epoch = 30
 
-
-
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True, reshape=[])
-
-
-
 
 def lrelu(x, th=0.2):
     return tf.maximum(th * x, x)
@@ -56,9 +51,6 @@ def discriminator(input, isTrain=True, reuse=False):
         flatconv4 = tf.reshape(lrelu4, [-1, 4 * 4 * 1024])
         print(lrelu4)
 
-        # output layer
-        #conv5 = tf.layers.conv2d(lrelu4, 1, [4, 4], strides=(1, 1), padding='valid')
-
         Wh = tf.Variable(initial_value=tf.random_normal([4 * 4 * 1024, 1000]))
         Wo = tf.Variable(initial_value=tf.random_normal([1000, 2]))
 
@@ -67,12 +59,9 @@ def discriminator(input, isTrain=True, reuse=False):
 
         hidden = tf.add(tf.matmul(flatconv4,Wh), Bh)
         out = tf.add(tf.matmul(hidden,Wo), Bo)
-        o = tf.nn.softmax(out, axis=1)
-
-
-        print(o)
-
-        return o, out
+        softOut = tf.nn.softmax(out, axis=1)
+        #print(o)
+        return softOut, out
 
 
 
@@ -157,18 +146,9 @@ flatG_z = tf.reshape(G_z, [batch_size,-1])
 D_real, D_real_logits = discriminator(x, isTrain)
 D_fake, D_fake_logits = discriminator(G_z, isTrain, reuse=True)
 
-# loss for each network
-'''
-D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_real_logits, labels=tf.ones([batch_size, 1, 1, 1])))
-D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_fake_logits, labels=tf.zeros([batch_size, 1, 1, 1])))
-D_loss = D_loss_real + D_loss_fake
-G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_fake_logits, labels=tf.ones([batch_size, 1, 1, 1])))
-'''
-
-
+# Wasserstein loss for each network
 D_loss = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
 G_loss = -tf.reduce_mean(D_fake)
-
 
 # trainable variables for each network
 T_vars = tf.trainable_variables()
@@ -186,7 +166,6 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
 
 # open session and initialize all variables
 config = tf.ConfigProto()
-#config.gpu_options.per_process_gpu_memory_fraction = 0.6
 sess = tf.InteractiveSession(config=config)
 writer = tf.summary.FileWriter('./my_graph/mnist', sess.graph)
 tf.global_variables_initializer().run()
@@ -254,7 +233,7 @@ for epoch in range(train_epoch):
             loss_d_, _ = sess.run([D_loss, D_optim], {x: x_, z: z_, isTrain: True})
         D_losses.append(loss_d_)
 
-        z_ = np.random.normal(0, 1, (batch_size, 32))
+        #z_ = np.random.normal(0, 1, (batch_size, 32))
         loss_g_, _,l1W, l1C, l1B, l2W, l2C, l2B, generatedImages = sess.run([G_loss, G_optim, W16, C16, B16, W8, C8, B8, flatG_z], {z: z_, x: x_, isTrain: True})
         G_losses.append(loss_g_)
 
