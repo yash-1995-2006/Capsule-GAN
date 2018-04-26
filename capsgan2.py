@@ -29,7 +29,7 @@ def generator(x, isTrain=True, reuse=False):
         return capsgen(x)
 
 
-def discriminator(input, isTrain=True, reuse=False):
+def discriminator(x, isTrain=True, reuse=False):
     with tf.variable_scope('discriminator', reuse=reuse):
         # 1st hidden layer
         print(x)
@@ -202,22 +202,12 @@ np.random.seed(int(time.time()))
 print('training start!')
 start_time = time.time()
 
-
-C1W = open("Capsule_Values/Capsule 1 W.txt","w+")
-C1C = open("Capsule_Values/Capsule 1 C.txt","w+")
-C1B = open("Capsule_Values/Capsule 1 B.txt","w+")
-
-C2W = open("Capsule_Values/Capsule 2 W.txt","w+")
-C2C = open("Capsule_Values/Capsule 2 C.txt","w+")
-C2B = open("Capsule_Values/Capsule 2 B.txt","w+")
-
 X, Y = train_set, mnist.train.labels
 X, Y = np.vstack((X, test_set)), np.vstack((Y,mnist.test.labels))
 X, Y = np.vstack((X, val_set)), np.vstack((Y,mnist.validation.labels))
 X, Y = X.reshape((70000, -1)), Y.reshape((70000,-1))
 nn = NearestNeighbors(n_neighbors=1, algorithm='auto')
 nn.fit(X)
-
 
 loc = 0
 for epoch in range(train_epoch):
@@ -245,23 +235,9 @@ for epoch in range(train_epoch):
                 print('Closest label: ', labels[l], ' distance: ', distance[l])
 
 
-        '''
-        if iter%50 == 0:
-                
-            str1 = "Iter: " + str(iter + 1) + "\n" + np.array2string(np.ravel(l1W)).replace('\n', '') + "\n"
-            str2 = "Iter: " + str(iter + 1) + "\n" + np.array2string(np.ravel(l1C)).replace('\n', '') + "\n"
-            str3 = "Iter: " + str(iter + 1) + "\n" + np.array2string(np.ravel(l2W)).replace('\n', '') + "\n"
-            str4 = "Iter: " + str(iter + 1) + "\n" + np.array2string(np.ravel(l2C)).replace('\n', '') + "\n"
-            str5 = "Iter: " + str(iter + 1) + "\n" + np.array2string(np.ravel(l1B)).replace('\n', '') + "\n"
-            str6 = "Iter: " + str(iter + 1) + "\n" + np.array2string(np.ravel(l2B)).replace('\n', '') + "\n"
 
-            C1W.write(str1)
-            C1C.write(str2)
-            C1B.write(str5)
-            C2W.write(str3)
-            C2C.write(str4)
-            C2B.write(str6)
-            
+        if iter%50 == 0:
+
             fl1W, fl1C, fl1B, fl2W, fl2C, fl2B = np.ravel(l1W), np.ravel(l1C), np.ravel(l1B), np.ravel(l2W), np.ravel(l2C), np.ravel(l2B)
             try:
                 loc += 1
@@ -289,7 +265,7 @@ for epoch in range(train_epoch):
             dfl2W.to_csv("l2W.csv")
             dfl2C.to_csv("l2C.csv")
             dfl2B.to_csv("l2B.csv")
-        '''
+
 
 
     epoch_end_time = time.time()
@@ -306,12 +282,6 @@ end_time = time.time()
 total_ptime = end_time - start_time
 train_hist['total_ptime'].append(total_ptime)
 
-'''
-C1W.close()
-C2W.close()
-C1C.close()
-C2C.close()
-'''
 
 print('Avg per epoch ptime: %.2f, total %d epochs ptime: %.2f' % (
 np.mean(train_hist['per_epoch_ptimes']), train_epoch, total_ptime))

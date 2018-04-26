@@ -5,7 +5,6 @@ from operator import mul
 batchSize=64
 
 
-
 def squash(capsule, epsilon=1e-9):
     '''
     :param vector: A tensor with shape [batch_size, 1, num_caps, vec_len, 1] or [batch_size, num_caps, vec_len, 1]
@@ -29,8 +28,8 @@ def capsgen(x, initCapsuleSize = 32, batchSize = 64, isTrain = True):
     #normalize the vector to make size of capsule 1
     x = tf.nn.l2_normalize(x, dim=1)
     x = tf.expand_dims(tf.expand_dims(x,axis=2), axis=1, name='expanded_x')    #[batch size x number of capsules x capsules length x 1]
-    capsule16, W16, C16, B16= capslayer(x, layerNo=1, capsuleLength=16, numberOfCapsules=10)                        #[batch size x number of capsules x capsules length x 1]
-    capsule8, W8, C8, B8 = capslayer(capsule16, layerNo=2, capsuleLength=8, numberOfCapsules=1152)                #[batch size x number of capsules x capsules length x 1]
+    capsule16, W16, C16, B16= capslayer(x, layerNo=1, capsuleLength=16, numberOfCapsules=10, stddev=0.05)                        #[batch size x number of capsules x capsules length x 1]
+    capsule8, W8, C8, B8 = capslayer(capsule16, layerNo=2, capsuleLength=8, numberOfCapsules=1152, stddev=1e-7)                #[batch size x number of capsules x capsules length x 1]
     convImageSize = 6
     reshapedCaps = tf.reshape(capsule8, shape=[batchSize,convImageSize, convImageSize,-1], name="reshapedCaps")      #[batch size x x_dim x y_dim x number of filters]
     conv1 = tf.layers.conv2d_transpose(reshapedCaps,filters=128,kernel_size=[4,4], padding="valid", name='Conv1')
@@ -101,7 +100,7 @@ def modifiedDynamicRouting(inputCaps,outputCapsuleNumber, layerNo, iter=3, stdde
 
 
 
-def capslayer(x, capsuleLength, numberOfCapsules, layerNo, routing = 'Modified Dynamic Routing'):
+def capslayer(x, capsuleLength, numberOfCapsules, layerNo, stddev, routing = 'Modified Dynamic Routing'):
     '''
     :param x: input activation vectors [batch size x number of capsules x capsules length x 1]
     :param capsuleLength: Length of required capsules
@@ -116,7 +115,7 @@ def capslayer(x, capsuleLength, numberOfCapsules, layerNo, routing = 'Modified D
     inputCapsLen = inputShape[-2:]
     with tf.variable_scope("Capsule"+str(layerNo)):
         if routing == 'Modified Dynamic Routing':
-            routedValues, C, B = modifiedDynamicRouting(x,numberOfCapsules,layerNo=layerNo, stddev=0.05)    #[batch size x inputCapsuleNumber x outputCapsuleNumber x input capsule length x 1]
+            routedValues, C, B = modifiedDynamicRouting(x,numberOfCapsules,layerNo=layerNo, stddev=stddev)    #[batch size x inputCapsuleNumber x outputCapsuleNumber x input capsule length x 1]
         W = tf.Variable(name='W'+str(layerNo), trainable=True, initial_value=tf.random_normal([inputCapsNum, numberOfCapsules, capsuleLength, inputCapsLen[0]]))
         Wx = tf.tile(tf.expand_dims(W,axis=0),[batchSize,1,1,1,1])      #[batch size x inputCapsNumber x numberOfCapsules, capsuleLength, input Capsule Length]
         weightedVectors = tf.matmul(Wx, routedValues)                    #[batch size x inputCapsuleNumber x outputCapsuleNumber x output capsule length x 1]
