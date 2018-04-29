@@ -49,21 +49,35 @@ def capsgen(x, initCapsuleSize = 32, batchSize = 64, isTrain = True):
 
 
 
-def generateNoisyVector(vector, outputCapsuleNumber, stddev=1.0):
+
+
+def generateNoisyVector(vector, outputCapsuleNumber, uniformNoise=False, uniformAvg = False, uniformMin = False, uniformNoiseRatio=1.0, stddev=1.0):
     '''
-    :param vector: input vector to replicate and add noise to for Routing
+    :param vector: input vector to replicate and add noise to for Routing [batch size x number of input capsules x capsule length x 1]
     :param outputCapsuleNumber: Number of Capsules in the required layer
+    :param uniformNoise: generate noise belonging to uniform distribution
+    :param uniformAvg: range of uniform distribution for each capsule is between [ -mean of absolute capsule values, +mean of absolute capsule values]
+    :param uniformMin: range of uniform distribution for each capsule is between [ -mean of absolute capsule values, +mean of absolute capsule values]
     :return: [batch size x number of input caps x number of output caps x capsule size x 1]
     '''
     print("in gNV ", vector)
     #increase vector dimensions
-    vector = tf.tile(tf.expand_dims(vector, axis=2),[1,1,outputCapsuleNumber,1,1])
-
-    #add random noise to half the elements of the tensor
-    noise = tf.random_normal(shape=tf.shape(vector),stddev=stddev)
-    vector = tf.add(vector, noise)
+    inputCapsuleLength = tf.shape(vector)[-2]
+    vector = tf.tile(tf.expand_dims(vector, axis=2),[1,1,outputCapsuleNumber,1,1]) #[[batch size x number of input capsules x number of output capsules x capsule length x 1]
+    if uniformNoise == False:
+        #add random noise to elements of the tensor
+        noise = tf.random_normal(shape=tf.shape(vector),stddev=stddev)
+        vector = tf.add(vector, noise)
+    else:
+        if uniformAvg == True:
+            metric = tf.reduce_mean(vector,axis=3,keepdims=True, name='metric')
+        elif uniformMin == True:
+            metric = tf.reduce_min(vector,axis=3,keepdims=True, name='metric')
+        noise = tf.random_uniform(shape=tf.shape(vector),minval=-1*uniformNoiseRatio,maxval=uniformNoiseRatio, name='initial_noise')
+        expandMetric = tf.tile(metric, (1,1,1,inputCapsuleLength,1), name='expanded_metric')
+        noise = tf.multiply(expandMetric, noise, name='multiplied_noise')
+        vector = tf.add(vector,noise)
     return vector
-
 
 
 
@@ -81,10 +95,10 @@ def modifiedDynamicRouting(inputCaps,outputCapsuleNumber, layerNo, iter=3, stdde
         inputShape = inputCaps.get_shape().as_list()
         numberOfInputCaps = inputShape[1]
         B = tf.Variable(name='B'+str(layerNo), trainable=False, initial_value=tf.random_normal([numberOfInputCaps, outputCapsuleNumber-1, 1, 1], dtype=tf.float32))
-        expandedInput = generateNoisyVector(inputCaps, outputCapsuleNumber-1, stddev=stddev)
+        expandedInput = generateNoisyVector(inputCaps, outputCapsuleNumber-1, uniformNoise=True, uniformNoiseRatio=0.5, uniformAvg=True)
         for i in range(iter):
             with tf.variable_scope('iter_' + str(i)):
-                C = tf.nn.softmax(B, axis=2)
+                C = tf.nn.softmax(B, dim=1)
                 agreedValues = tf.multiply(expandedInput, C)                
                 sumExpandedCaps = tf.reduce_sum(agreedValues, axis=2)
                 extraCaps = tf.expand_dims(tf.subtract(inputCaps,sumExpandedCaps), axis=2)
