@@ -59,7 +59,7 @@ def discriminator(x, isTrain=True, reuse=False):
 
         hidden = tf.add(tf.matmul(flatconv4,Wh), Bh)
         out = tf.add(tf.matmul(hidden,Wo), Bo)
-        softOut = tf.nn.softmax(out, axis=1)
+        softOut = tf.nn.softmax(out, dim=1)
         #print(o)
         return softOut, out
 
@@ -139,7 +139,7 @@ z = tf.placeholder(tf.float32, shape=(None, 32))
 isTrain = tf.placeholder(dtype=tf.bool)
 
 # networks : generator
-G_z, W16, C16, B16, W8, C8, B8 = generator(z, isTrain)
+G_z, W8, C8, B8 = generator(z, isTrain)
 flatG_z = tf.reshape(G_z, [batch_size,-1])
 # networks : discriminator
 
@@ -224,7 +224,7 @@ for epoch in range(train_epoch):
         D_losses.append(loss_d_)
 
         #z_ = np.random.normal(0, 1, (batch_size, 32))
-        loss_g_, _,l1W, l1C, l1B, l2W, l2C, l2B, generatedImages = sess.run([G_loss, G_optim, W16, C16, B16, W8, C8, B8, flatG_z], {z: z_, x: x_, isTrain: True})
+        loss_g_, _, l2W, l2C, l2B, generatedImages = sess.run([G_loss, G_optim, W8, C8, B8, flatG_z], {z: z_, x: x_, isTrain: True})
         G_losses.append(loss_g_)
 
         print('Batch Done: ', iter + 1)
@@ -236,32 +236,22 @@ for epoch in range(train_epoch):
 
 
 
-        if iter%50 == 0:
+        if iter%10 == 0:
 
-            fl1W, fl1C, fl1B, fl2W, fl2C, fl2B = np.ravel(l1W), np.ravel(l1C), np.ravel(l1B), np.ravel(l2W), np.ravel(l2C), np.ravel(l2B)
+            fl2W, fl2C, fl2B = np.ravel(l2W), np.ravel(l2C), np.ravel(l2B)
             try:
                 loc += 1
-                dfl1W.loc[loc] = np.expand_dims(fl1W, axis=0)
-                dfl1C.loc[loc] = np.expand_dims(fl1C, axis=0)
-                dfl1B.loc[loc] = np.expand_dims(fl1B, axis=0)
-                dfl2W.loc[loc] = np.expand_dims(fl2W, axis=0)
+                '''dfl2W.loc[loc] = np.expand_dims(fl2W, axis=0)
                 dfl2C.loc[loc] = np.expand_dims(fl2C, axis=0)
-                dfl2B.loc[loc] = np.expand_dims(fl2B, axis=0)
-                dfl1C.loc[loc] = fl1C
-                dfl1B.loc[loc] = fl1B
+                dfl2B.loc[loc] = np.expand_dims(fl2B, axis=0)'''
+                dfl2W.loc[loc] = fl2W
                 dfl2C.loc[loc] = fl2C
                 dfl2B.loc[loc] = fl2B
             except:
-                dfl1W = pd.DataFrame(np.expand_dims(fl1W, axis=0))
-                dfl1C = pd.DataFrame(np.expand_dims(fl1C, axis=0))
-                dfl1B = pd.DataFrame(np.expand_dims(fl1B, axis=0))
                 dfl2W = pd.DataFrame(np.expand_dims(fl2W, axis=0))
                 dfl2C = pd.DataFrame(np.expand_dims(fl2C, axis=0))
                 dfl2B = pd.DataFrame(np.expand_dims(fl2B, axis=0))
 
-            dfl1W.to_csv("l1W.csv")
-            dfl1C.to_csv("l1C.csv")
-            dfl1B.to_csv("l1B.csv")
             dfl2W.to_csv("l2W.csv")
             dfl2C.to_csv("l2C.csv")
             dfl2B.to_csv("l2B.csv")

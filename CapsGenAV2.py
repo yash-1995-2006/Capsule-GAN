@@ -28,8 +28,8 @@ def capsgen(x, initCapsuleSize = 32, batchSize = 64, isTrain = True):
     #normalize the vector to make size of capsule 1
     x = tf.nn.l2_normalize(x, dim=1)
     x = tf.expand_dims(tf.expand_dims(x,axis=2), axis=1, name='expanded_x')    #[batch size x number of capsules x capsules length x 1]
-    capsule16, W16, C16, B16= capslayer(x, layerNo=1, capsuleLength=16, numberOfCapsules=10, stddev=0.05)                        #[batch size x number of capsules x capsules length x 1]
-    capsule8, W8, C8, B8 = capslayer(capsule16, layerNo=2, capsuleLength=8, numberOfCapsules=1152, stddev=1e-7)                #[batch size x number of capsules x capsules length x 1]
+    #capsule16, W16, C16, B16= capslayer(x, layerNo=1, capsuleLength=16, numberOfCapsules=10, stddev=0.05)                        #[batch size x number of capsules x capsules length x 1]
+    capsule8, W8, C8, B8 = capslayer(x, layerNo=1, capsuleLength=8, numberOfCapsules=1152, stddev=0.1)                #[batch size x number of capsules x capsules length x 1]
     convImageSize = 6
     reshapedCaps = tf.reshape(capsule8, shape=[batchSize,convImageSize, convImageSize,-1], name="reshapedCaps")      #[batch size x x_dim x y_dim x number of filters]
     conv1 = tf.layers.conv2d_transpose(reshapedCaps,filters=128,kernel_size=[4,4], padding="valid", name='Conv1')
@@ -45,9 +45,7 @@ def capsgen(x, initCapsuleSize = 32, batchSize = 64, isTrain = True):
     relu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain), 0.2)
 
     tanh = tf.nn.tanh(relu4,name='tanh')
-    return tanh, W16, C16, B16, W8, C8, B8
-
-
+    return tanh, W8, C8, B8
 
 
 
@@ -55,9 +53,7 @@ def generateNoisyVector(vector, outputCapsuleNumber, uniformNoise=False, uniform
     '''
     :param vector: input vector to replicate and add noise to for Routing [batch size x number of input capsules x capsule length x 1]
     :param outputCapsuleNumber: Number of Capsules in the required layer
-    :param uniformNoise: generate noise belonging to uniform distribution
-    :param uniformAvg: range of uniform distribution for each capsule is between [ -mean of absolute capsule values, +mean of absolute capsule values]
-    :param uniformMin: range of uniform distribution for each capsule is between [ -mean of absolute capsule values, +mean of absolute capsule values]
+    :param uniformNoise: generate noise belong
     :return: [batch size x number of input caps x number of output caps x capsule size x 1]
     '''
     print("in gNV ", vector)
@@ -65,7 +61,7 @@ def generateNoisyVector(vector, outputCapsuleNumber, uniformNoise=False, uniform
     inputCapsuleLength = tf.shape(vector)[-2]
     vector = tf.tile(tf.expand_dims(vector, axis=2),[1,1,outputCapsuleNumber,1,1]) #[[batch size x number of input capsules x number of output capsules x capsule length x 1]
     if uniformNoise == False:
-        #add random noise to elements of the tensor
+        #add random noise to half the elements of the tensor
         noise = tf.random_normal(shape=tf.shape(vector),stddev=stddev)
         vector = tf.add(vector, noise)
     else:
@@ -78,6 +74,10 @@ def generateNoisyVector(vector, outputCapsuleNumber, uniformNoise=False, uniform
         noise = tf.multiply(expandMetric, noise, name='multiplied_noise')
         vector = tf.add(vector,noise)
     return vector
+
+
+
+
 
 
 
@@ -95,7 +95,7 @@ def modifiedDynamicRouting(inputCaps,outputCapsuleNumber, layerNo, iter=3, stdde
         inputShape = inputCaps.get_shape().as_list()
         numberOfInputCaps = inputShape[1]
         B = tf.Variable(name='B'+str(layerNo), trainable=False, initial_value=tf.random_normal([numberOfInputCaps, outputCapsuleNumber-1, 1, 1], dtype=tf.float32))
-        expandedInput = generateNoisyVector(inputCaps, outputCapsuleNumber-1, uniformNoise=True, uniformNoiseRatio=0.5, uniformAvg=True)
+        expandedInput = generateNoisyVector(inputCaps, outputCapsuleNumber-1, uniformNoise=True,uniformMin=True,uniformNoiseRatio=0.5)
         for i in range(iter):
             with tf.variable_scope('iter_' + str(i)):
                 C = tf.nn.softmax(B, dim=1)
