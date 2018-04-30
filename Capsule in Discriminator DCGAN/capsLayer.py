@@ -1,8 +1,3 @@
-"""
-License: Apache-2.0
-Author: Huadong Liao
-E-mail: naturomics.liao@gmail.com
-"""
 
 import numpy as np
 import tensorflow as tf
